@@ -2,10 +2,22 @@
 
 
 [[projects]]
+  branch = "master"
+  name = "github.com/Azure/go-ansiterm"
+  packages = [
+    ".",
+    "winterm"
+  ]
+  revision = "d6e3b3328b783f23731bc4d058875b0371ff8109"
+
+[[projects]]
+  branch = "master"
   name = "github.com/docker/docker"
-  packages = ["pkg/term"]
-  revision = "a8a31eff10544860d2188dddabdee4d727545796"
-  version = "v1.5.0"
+  packages = [
+    "pkg/term",
+    "pkg/term/windows"
+  ]
+  revision = "766d9edf39b79e11018bb0f55056b5bd915ddf3c"
 
 [[projects]]
   name = "github.com/docker/machine"
@@ -22,8 +34,8 @@
     "libmachine/version",
     "version"
   ]
-  revision = "a650a404fc3e006fea17b12615266168db79c776"
-  version = "v0.7.0"
+  revision = "89b833253d9412716a0291cbdccc94454c33d1b5"
+  version = "v0.14.0"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -32,19 +44,39 @@
   version = "v0.8.0"
 
 [[projects]]
-  name = "github.com/xanzy/go-cloudstack"
-  packages = ["cloudstack"]
-  revision = "deca6e17c056012b540aa2d2eae3ea1e63203b85"
-  version = "v2.1.6"
+  name = "github.com/sirupsen/logrus"
+  packages = ["."]
+  revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
+  version = "v1.0.5"
 
 [[projects]]
+  name = "github.com/xanzy/go-cloudstack"
+  packages = ["cloudstack"]
+  revision = "3934d17bfafbc810e8f60b3a8168ab9d9e7c2740"
+  version = "v2.3.2"
+
+[[projects]]
+  branch = "master"
   name = "golang.org/x/crypto"
   packages = [
     "curve25519",
+    "ed25519",
+    "ed25519/internal/edwards25519",
+    "internal/chacha20",
+    "poly1305",
     "ssh",
     "ssh/terminal"
   ]
-  revision = "beef0f4390813b96e8e68fd78570396d0f4751fc"
+  revision = "88942b9c40a4c9d203b82b3731787b672d6e809b"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/sys"
+  packages = [
+    "unix",
+    "windows"
+  ]
+  revision = "91ee8cde435411ca3f1cd365e8f20131aed4d0a1"
 
 [[projects]]
   name = "gopkg.in/yaml.v2"
