@@ -75,7 +75,7 @@ release:
   # Default is extracted from the origin remote URL.
   github:
     owner: dahendel
-    name: github.com/dahendel/docker-machine-driver-cloudstack
+    name: docker-machine-driver-cloudstack
 
   # If set to true, will not auto-publish the release.
   # Default is false.
