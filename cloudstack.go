@@ -383,6 +383,7 @@ func (d *Driver) PreCreateCheck() error {
 // Create a host using the driver's config
 func (d *Driver) Create() error {
 	cs := d.getClient()
+
 	if err := d.createKeyPair(); err != nil {
 		return err
 	}
@@ -447,6 +448,9 @@ func (d *Driver) Create() error {
 			return err
 		}
 	}
+
+	d.IPAddress = d.PrivateIP
+
 	return nil
 }
 
@@ -975,7 +979,7 @@ func (d *Driver) createKeyPair() error {
 	}
 
 	if !exists {
-		log.Infof("Registering SSH key pair...")
+		log.Infof("Registering SSH key pair %s...", d.SSHKeyPair)
 		p := cs.SSH.NewRegisterSSHKeyPairParams(d.SSHKeyPair, string(publicKey))
 		if d.ProjectID != "" {
 			p.SetProjectid(d.ProjectID)
