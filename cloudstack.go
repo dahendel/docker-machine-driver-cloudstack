@@ -6,15 +6,15 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"crypto/md5"
 	"github.com/docker/machine/libmachine/drivers"
 	"github.com/docker/machine/libmachine/log"
 	"github.com/docker/machine/libmachine/mcnflag"
 	"github.com/docker/machine/libmachine/ssh"
 	"github.com/docker/machine/libmachine/state"
+	"github.com/pkg/errors"
 	"github.com/xanzy/go-cloudstack/cloudstack"
 	"gopkg.in/yaml.v2"
-	"github.com/pkg/errors"
-	"crypto/md5"
 	"net/http"
 )
 
@@ -24,6 +24,7 @@ const (
 	swarmPort    = 3376
 	diskDatadisk = "DATADISK"
 )
+
 var keyExists bool
 
 type configError struct {
@@ -73,18 +74,15 @@ type Driver struct {
 	DisplayName          string
 }
 
-
 type UserDataYAML struct {
 	SSHAuthorizedKeys []string `yaml:"ssh_authorized_keys,omitempty"`
-	SSHKeys struct{
+	SSHKeys           struct {
 		RSAPrivate string `yaml:"rsa_private,omitempty"`
 		DSAPrivate string `yaml:"dsa_private,omitempty"`
-		RSAPublic string `yaml:"rsa_public,omitempty"`
-		DSAPublic string `yaml:"dsa_public,omitempty"`
+		RSAPublic  string `yaml:"rsa_public,omitempty"`
+		DSAPublic  string `yaml:"dsa_public,omitempty"`
 	} `yaml:"ssh_keys,omitempty"`
 }
-
-
 
 // GetCreateFlags registers the flags this driver adds to
 // "docker hosts create"
@@ -216,7 +214,7 @@ func NewDriver(hostName, storePath string) drivers.Driver {
 	driver := &Driver{
 		BaseDriver: &drivers.BaseDriver{
 			MachineName: hostName,
-			StorePath: storePath,
+			StorePath:   storePath,
 		},
 		FirewallRuleIds: []string{},
 	}
@@ -391,7 +389,7 @@ func (d *Driver) Create() error {
 		d.ServiceOfferingID, d.TemplateID, d.ZoneID)
 	p.SetName(d.MachineName)
 	p.SetDisplayname(d.DisplayName)
-	log.Infof("Setting Keypair form VM: %s", d.SSHKeyPair)
+	log.Infof("Setting Keypair for VM: %s", d.SSHKeyPair)
 	p.SetKeypair(d.SSHKeyPair)
 	if d.UserData != "" {
 		p.SetUserdata(d.UserData)
@@ -786,9 +784,7 @@ func (d *Driver) readUserDataFromURL(userDataURL string) ([]byte, error) {
 
 	return ioutil.ReadAll(resp.Body)
 
-
 }
-
 
 func (d *Driver) setProject(projectName string, projectID string) error {
 	d.Project = projectName
@@ -904,7 +900,6 @@ func (d *Driver) checkKeyPairByFingerprint(pubKey string) (bool, error) {
 	return false, nil
 }
 
-
 func (d *Driver) checkInstance() error {
 	cs := d.getClient()
 
@@ -988,7 +983,6 @@ func (d *Driver) createKeyPair() error {
 			return err
 		}
 	}
-
 
 	return nil
 }
@@ -1273,7 +1267,6 @@ func (d *Driver) writeSSHKeys(priv, pub string) error {
 	if priv == "" {
 		return errors.New("A private key must be passed in the userdata file under the ssh_keys")
 	}
-
 
 	log.Infof("Writing first private key found in userdata file to %s", d.StorePath)
 	if err := ioutil.WriteFile(d.GetSSHKeyPath(), []byte(priv), 0600); err != nil {
