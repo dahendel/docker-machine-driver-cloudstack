@@ -62,6 +62,7 @@ nfpm:
   bindir: /usr/bin
 
 archive:
+  format: binary
   replacements:
     darwin: Darwin
     linux: Linux

@@ -127,9 +127,10 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage: "CloudStack Public IP",
 		},
 		mcnflag.StringFlag{
-			Name:  "cloudstack-ssh-user",
-			Usage: "CloudStack SSH user",
-			Value: "root",
+			Name:   "cloudstack-ssh-user",
+			Usage:  "CloudStack SSH user",
+			Value:  "root",
+			EnvVar: "CLOUDSTACK_SSH_USER",
 		},
 		mcnflag.StringSliceFlag{
 			Name:  "cloudstack-cidr",
@@ -140,40 +141,45 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage: "Whether or not to expunge the machine upon removal",
 		},
 		mcnflag.StringFlag{
-			Name:  "cloudstack-template",
-			Usage: "CloudStack template",
+			Name:   "cloudstack-template",
+			Usage:  "CloudStack template",
+			EnvVar: "CLOUDSTACK_TEMPLATE",
 		},
 		mcnflag.StringFlag{
 			Name:  "cloudstack-template-id",
 			Usage: "Cloudstack template id",
 		},
 		mcnflag.StringFlag{
-			Name:  "cloudstack-service-offering",
-			Usage: "CloudStack service offering",
+			Name:   "cloudstack-service-offering",
+			Usage:  "CloudStack service offering",
+			EnvVar: "CLOUDSTACK_SERVICE_OFFERING",
 		},
 		mcnflag.StringFlag{
 			Name:  "cloudstack-service-offering-id",
 			Usage: "CloudStack service offering id",
 		},
 		mcnflag.StringFlag{
-			Name:  "cloudstack-network",
-			Usage: "CloudStack network",
+			Name:   "cloudstack-network",
+			Usage:  "CloudStack network",
+			EnvVar: "CLOUDSTACK_NETWORK",
 		},
 		mcnflag.StringFlag{
 			Name:  "cloudstack-network-id",
 			Usage: "CloudStack network id",
 		},
 		mcnflag.StringFlag{
-			Name:  "cloudstack-zone",
-			Usage: "CloudStack zone",
+			Name:   "cloudstack-zone",
+			Usage:  "CloudStack zone",
+			EnvVar: "CLOUDSTACK_ZONE",
 		},
 		mcnflag.StringFlag{
 			Name:  "cloudstack-zone-id",
 			Usage: "CloudStack zone id",
 		},
 		mcnflag.StringFlag{
-			Name:  "cloudstack-userdata-file",
-			Usage: "CloudStack Userdata file",
+			Name:   "cloudstack-userdata-file",
+			Usage:  "CloudStack Userdata file",
+			EnvVar: "CLOUDSTACK_USERDATA_FILE",
 		},
 		mcnflag.StringFlag{
 			Name:  "cloudstack-project",
@@ -188,16 +194,18 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage: "key:value resource tags to be created",
 		},
 		mcnflag.StringFlag{
-			Name:  "cloudstack-disk-offering",
-			Usage: "Cloudstack disk offering",
+			Name:   "cloudstack-disk-offering",
+			Usage:  "Cloudstack disk offering",
+			EnvVar: "CLOUDSTACK_DISK_OFFERING",
 		},
 		mcnflag.StringFlag{
 			Name:  "cloudstack-disk-offering-id",
 			Usage: "Cloudstack disk offering id",
 		},
 		mcnflag.IntFlag{
-			Name:  "cloudstack-disk-size",
-			Usage: "Disk offering custom size",
+			Name:   "cloudstack-disk-size",
+			Usage:  "Disk offering custom size",
+			EnvVar: "CLOUDSTACK_CUSTOM_DISK_SIZE",
 		},
 		mcnflag.BoolFlag{
 			Name:  "cloudstack-delete-volumes",
@@ -974,7 +982,7 @@ func (d *Driver) createKeyPair() error {
 	}
 
 	if !exists {
-		log.Infof("Registering SSH key pair %s...", d.SSHKeyPair)
+		log.Infof("Registering SSH key pair %s", d.SSHKeyPair)
 		p := cs.SSH.NewRegisterSSHKeyPairParams(d.SSHKeyPair, string(publicKey))
 		if d.ProjectID != "" {
 			p.SetProjectid(d.ProjectID)
@@ -992,13 +1000,35 @@ func (d *Driver) deleteKeyPair() error {
 
 	log.Infof("Deleting SSH key pair...")
 
+	fp, err := ioutil.ReadFile(d.SSHKeyPath + ".pub")
+
+	if err != nil {
+		return err
+	}
+
+	inUse, err := d.checkKeyPairByFingerprint(string(fp))
+
+	if err != nil {
+		return err
+	}
+
+	if inUse {
+		log.Infof("Key %s is still in use for another VM, skipping key deletion", string(fp))
+		return nil
+	}
+
 	p := cs.SSH.NewDeleteSSHKeyPairParams(d.SSHKeyPair)
 	if d.ProjectID != "" {
 		p.SetProjectid(d.ProjectID)
 	}
+
 	if _, err := cs.SSH.DeleteSSHKeyPair(p); err != nil {
-		return err
+		// Throw away the error because it most likely means that a key doesn't exist
+		// It is ok because we can use the same key for multiple machines.
+		log.Warnf("Key may not exist: %s", err)
+		return nil
 	}
+
 	return nil
 }
 

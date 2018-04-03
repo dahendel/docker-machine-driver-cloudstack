@@ -23,6 +23,5 @@
 
 [[constraint]]
   name = "github.com/docker/machine"
-
 [[constraint]]
   name = "github.com/xanzy/go-cloudstack"
