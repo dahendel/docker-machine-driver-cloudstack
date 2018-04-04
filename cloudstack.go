@@ -753,22 +753,22 @@ func (d *Driver) setPublicIP(publicip string) error {
 }
 
 func (d *Driver) setUserData(userDataFile string) error {
-	d.UserDataFile = userDataFile
 	var data []byte
 	var err error
-	if d.UserDataFile == "" {
+	if userDataFile == "" {
 		return nil
 	}
 
-	if strings.HasPrefix(d.UserDataFile, "http") {
-		data, err = d.readUserDataFromURL(d.UserDataFile)
+	if strings.HasPrefix(userDataFile, "http") {
+		data, err = d.readUserDataFromURL(userDataFile)
 
 		if err != nil {
-			return fmt.Errorf("Failed to read userdatat from url %s: %s", d.UserDataFile, err)
+			return fmt.Errorf("Failed to read userdata from url %s: %s", d.UserDataFile, err)
 		}
 
 	} else {
-		data, err = ioutil.ReadFile(d.UserDataFile)
+
+		data, err = ioutil.ReadFile(userDataFile)
 		if err != nil {
 			return fmt.Errorf("Failed to read user data file from path %s: %s", d.UserDataFile, err)
 		}

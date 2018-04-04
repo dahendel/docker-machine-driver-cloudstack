@@ -62,12 +62,13 @@ nfpm:
   bindir: /usr/bin
 
 archive:
+  name_template: "{{ .ProjectName }}_{{ .Os }}"
   format: binary
   replacements:
     darwin: Darwin
     linux: Linux
     windows: Windows
-    amd64: x86_64
+    amd64: amd64
 checksum:
   name_template: 'checksums.txt'
 
