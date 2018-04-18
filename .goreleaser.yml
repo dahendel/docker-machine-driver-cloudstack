@@ -62,7 +62,7 @@ nfpm:
   bindir: /usr/bin
 
 archive:
-  name_template: "{{ .ProjectName }}_{{ .Os }}"
+  name_template: "{{ .ProjectName }}_{{ .Os }}.{{ .Arch }}"
   format: binary
   replacements:
     darwin: Darwin

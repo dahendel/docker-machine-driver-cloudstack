@@ -14,7 +14,6 @@ import (
 	"github.com/docker/machine/libmachine/state"
 	"github.com/pkg/errors"
 	"github.com/xanzy/go-cloudstack/cloudstack"
-	"gopkg.in/yaml.v2"
 	"net/http"
 )
 
@@ -25,8 +24,6 @@ const (
 	diskDatadisk = "DATADISK"
 )
 
-var keyExists bool
-
 type configError struct {
 	option string
 }
@@ -35,11 +32,12 @@ func (e *configError) Error() string {
 	return fmt.Sprintf("cloudstack driver requires the --cloudstack-%s option", e.option)
 }
 
+// Driver is the new cloudstack driver
 type Driver struct {
 	*drivers.BaseDriver
-	Id                   string
-	ApiURL               string
-	ApiKey               string
+	ID                   string
+	APIURL               string
+	APIKey               string
 	SecretKey            string
 	HTTPGETOnly          bool
 	JobTimeOut           int64
@@ -72,16 +70,6 @@ type Driver struct {
 	ProjectID            string
 	Tags                 []string
 	DisplayName          string
-}
-
-type UserDataYAML struct {
-	SSHAuthorizedKeys []string `yaml:"ssh_authorized_keys,omitempty"`
-	SSHKeys           struct {
-		RSAPrivate string `yaml:"rsa_private,omitempty"`
-		DSAPrivate string `yaml:"dsa_private,omitempty"`
-		RSAPublic  string `yaml:"rsa_public,omitempty"`
-		DSAPublic  string `yaml:"dsa_public,omitempty"`
-	} `yaml:"ssh_keys,omitempty"`
 }
 
 // GetCreateFlags registers the flags this driver adds to
@@ -218,6 +206,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 	}
 }
 
+// NewDriver creates new driver instance
 func NewDriver(hostName, storePath string) drivers.Driver {
 	driver := &Driver{
 		BaseDriver: &drivers.BaseDriver{
@@ -234,10 +223,12 @@ func (d *Driver) DriverName() string {
 	return driverName
 }
 
+// GetSSHHostname sets hostname to the host ip
 func (d *Driver) GetSSHHostname() (string, error) {
 	return d.GetIP()
 }
 
+// GetSSHUsername gets the ssh user
 func (d *Driver) GetSSHUsername() string {
 	if d.SSHUser == "" {
 		d.SSHUser = "root"
@@ -248,8 +239,8 @@ func (d *Driver) GetSSHUsername() string {
 // SetConfigFromFlags configures the driver with the object that was returned
 // by RegisterCreateFlags
 func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
-	d.ApiURL = flags.String("cloudstack-api-url")
-	d.ApiKey = flags.String("cloudstack-api-key")
+	d.APIURL = flags.String("cloudstack-api-url")
+	d.APIKey = flags.String("cloudstack-api-key")
 	d.SecretKey = flags.String("cloudstack-secret-key")
 	d.UsePrivateIP = flags.Bool("cloudstack-use-private-address")
 	d.UsePortForward = flags.Bool("cloudstack-use-port-forward")
@@ -292,10 +283,10 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 		d.DisplayName = d.MachineName
 	}
 	d.SSHKeyPair = d.MachineName
-	if d.ApiURL == "" {
+	if d.APIURL == "" {
 		return &configError{option: "api-url"}
 	}
-	if d.ApiKey == "" {
+	if d.APIKey == "" {
 		return &configError{option: "api-key"}
 	}
 	if d.SecretKey == "" {
@@ -338,13 +329,13 @@ func (d *Driver) GetIP() (string, error) {
 // GetState returns the state that the host is in (running, stopped, etc)
 func (d *Driver) GetState() (state.State, error) {
 	cs := d.getClient()
-	vm, count, err := cs.VirtualMachine.GetVirtualMachineByID(d.Id, d.setParams)
+	vm, count, err := cs.VirtualMachine.GetVirtualMachineByID(d.ID, d.setParams)
 	if err != nil {
 		return state.Error, err
 	}
 
 	if count == 0 {
-		return state.None, fmt.Errorf("Machine does not exist, use create command to create it")
+		return state.None, fmt.Errorf("machine does not exist, use create command to create it")
 	}
 
 	switch vm.State {
@@ -373,17 +364,13 @@ func (d *Driver) GetState() (state.State, error) {
 	return state.None, nil
 }
 
-// PreCreate allows for pre-create operations to make sure a driver is ready for creation
+// PreCreateCheck allows for pre-create operations to make sure a driver is ready for creation
 func (d *Driver) PreCreateCheck() error {
-	if err := d.checkKeyPairByName(); err != nil {
+	if err := d.checkKeyPair(); err != nil {
 		return err
 	}
 
-	if err := d.checkInstance(); err != nil {
-		return err
-	}
-
-	return nil
+	return d.checkInstance()
 }
 
 // Create a host using the driver's config
@@ -425,7 +412,7 @@ func (d *Driver) Create() error {
 	if err != nil {
 		return err
 	}
-	d.Id = vm.Id
+	d.ID = vm.Id
 	d.PrivateIP = vm.Nic[0].Ipaddress
 	if d.NetworkType == "Basic" {
 		d.PublicIP = d.PrivateIP
@@ -456,6 +443,7 @@ func (d *Driver) Create() error {
 	}
 
 	d.IPAddress = d.PrivateIP
+	d.SSHPort = 22
 
 	return nil
 }
@@ -463,7 +451,7 @@ func (d *Driver) Create() error {
 // Remove a host
 func (d *Driver) Remove() error {
 	cs := d.getClient()
-	p := cs.VirtualMachine.NewDestroyVirtualMachineParams(d.Id)
+	p := cs.VirtualMachine.NewDestroyVirtualMachineParams(d.ID)
 	p.SetExpunge(d.Expunge)
 	if err := d.deleteFirewallRules(); err != nil {
 		return err
@@ -509,7 +497,7 @@ func (d *Driver) Start() error {
 	}
 
 	cs := d.getClient()
-	p := cs.VirtualMachine.NewStartVirtualMachineParams(d.Id)
+	p := cs.VirtualMachine.NewStartVirtualMachineParams(d.ID)
 
 	if _, err = cs.VirtualMachine.StartVirtualMachine(p); err != nil {
 		return err
@@ -531,7 +519,7 @@ func (d *Driver) Stop() error {
 	}
 
 	cs := d.getClient()
-	p := cs.VirtualMachine.NewStopVirtualMachineParams(d.Id)
+	p := cs.VirtualMachine.NewStopVirtualMachineParams(d.ID)
 
 	if _, err = cs.VirtualMachine.StopVirtualMachine(p); err != nil {
 		return err
@@ -548,11 +536,11 @@ func (d *Driver) Restart() error {
 	}
 
 	if vmstate == state.Stopped {
-		return fmt.Errorf("Machine is stopped, use start command to start it")
+		return fmt.Errorf("machine is stopped, use start command to start it")
 	}
 
 	cs := d.getClient()
-	p := cs.VirtualMachine.NewRebootVirtualMachineParams(d.Id)
+	p := cs.VirtualMachine.NewRebootVirtualMachineParams(d.ID)
 
 	if _, err = cs.VirtualMachine.RebootVirtualMachine(p); err != nil {
 		return err
@@ -567,7 +555,7 @@ func (d *Driver) Kill() error {
 }
 
 func (d *Driver) getClient() *cloudstack.CloudStackClient {
-	cs := cloudstack.NewAsyncClient(d.ApiURL, d.ApiKey, d.SecretKey, false)
+	cs := cloudstack.NewAsyncClient(d.APIURL, d.APIKey, d.SecretKey, false)
 	cs.HTTPGETOnly = d.HTTPGETOnly
 	cs.AsyncTimeout(d.JobTimeOut)
 	return cs
@@ -592,7 +580,7 @@ func (d *Driver) setZone(zone string, zoneID string) error {
 		z, _, err = cs.Zone.GetZoneByName(d.Zone, d.setParams)
 	}
 	if err != nil {
-		return fmt.Errorf("Unable to get zone: %v", err)
+		return fmt.Errorf("unable to get zone: %v", err)
 	}
 
 	d.Zone = z.Name
@@ -615,7 +603,7 @@ func (d *Driver) setTemplate(templateName string, templateID string) error {
 	}
 
 	if d.ZoneID == "" {
-		return fmt.Errorf("Unable to get template: zone is not set")
+		return fmt.Errorf("unable to get template: zone is not set")
 	}
 
 	cs := d.getClient()
@@ -627,7 +615,7 @@ func (d *Driver) setTemplate(templateName string, templateID string) error {
 		template, _, err = cs.Template.GetTemplateByName(d.Template, "executable", d.ZoneID, d.setParams)
 	}
 	if err != nil {
-		return fmt.Errorf("Unable to get template: %v", err)
+		return fmt.Errorf("unable to get template: %v", err)
 	}
 
 	d.TemplateID = template.Id
@@ -656,7 +644,7 @@ func (d *Driver) setServiceOffering(serviceoffering string, serviceofferingID st
 		service, _, err = cs.ServiceOffering.GetServiceOfferingByName(d.ServiceOffering, d.setParams)
 	}
 	if err != nil {
-		return fmt.Errorf("Unable to get service offering: %v", err)
+		return fmt.Errorf("unable to get service offering: %v", err)
 	}
 
 	d.ServiceOfferingID = service.Id
@@ -685,7 +673,7 @@ func (d *Driver) setDiskOffering(diskOffering string, diskOfferingID string) err
 		disk, _, err = cs.DiskOffering.GetDiskOfferingByName(d.DiskOffering, d.setParams)
 	}
 	if err != nil {
-		return fmt.Errorf("Unable to get disk offering: %v", err)
+		return fmt.Errorf("unable to get disk offering: %v", err)
 	}
 
 	d.DiskOfferingID = disk.Id
@@ -714,7 +702,7 @@ func (d *Driver) setNetwork(networkName string, networkID string) error {
 		network, _, err = cs.Network.GetNetworkByName(d.Network, d.setParams)
 	}
 	if err != nil {
-		return fmt.Errorf("Unable to get network: %v", err)
+		return fmt.Errorf("unable to get network: %v", err)
 	}
 
 	d.NetworkID = network.Id
@@ -739,10 +727,10 @@ func (d *Driver) setPublicIP(publicip string) error {
 	p.SetIpaddress(d.PublicIP)
 	ips, err := cs.Address.ListPublicIpAddresses(p)
 	if err != nil {
-		return fmt.Errorf("Unable to get public ip id: %s", err)
+		return fmt.Errorf("unable to get public ip id: %s", err)
 	}
 	if ips.Count < 1 {
-		return fmt.Errorf("Unable to get public ip id: Not Found %s", d.PublicIP)
+		return fmt.Errorf("unable to get public ip id: Not Found %s", d.PublicIP)
 	}
 
 	d.PublicIPID = ips.PublicIpAddresses[0].Id
@@ -763,14 +751,14 @@ func (d *Driver) setUserData(userDataFile string) error {
 		data, err = d.readUserDataFromURL(userDataFile)
 
 		if err != nil {
-			return fmt.Errorf("Failed to read userdata from url %s: %s", d.UserDataFile, err)
+			return fmt.Errorf("failed to read userdata from url %s: %s", d.UserDataFile, err)
 		}
 
 	} else {
 
 		data, err = ioutil.ReadFile(userDataFile)
 		if err != nil {
-			return fmt.Errorf("Failed to read user data file from path %s: %s", d.UserDataFile, err)
+			return fmt.Errorf("failed to read user data file from path %s: %s", d.UserDataFile, err)
 		}
 	}
 
@@ -811,7 +799,7 @@ func (d *Driver) setProject(projectName string, projectID string) error {
 		p, _, err = cs.Project.GetProjectByName(d.Project)
 	}
 	if err != nil {
-		return fmt.Errorf("Invalid project: %s", err)
+		return fmt.Errorf("invalid project: %s", err)
 	}
 
 	d.ProjectID = p.Id
@@ -823,9 +811,11 @@ func (d *Driver) setProject(projectName string, projectID string) error {
 	return nil
 }
 
-func (d *Driver) checkKeyPairByName() error {
+func (d *Driver) checkKeyPair() error {
 	cs := d.getClient()
+
 	log.Infof("Checking if SSH key pair (%v) already exists...", d.SSHKeyPair)
+
 	p := cs.SSH.NewListSSHKeyPairsParams()
 	p.SetName(d.SSHKeyPair)
 	if d.ProjectID != "" {
@@ -836,14 +826,8 @@ func (d *Driver) checkKeyPairByName() error {
 		return err
 	}
 	if res.Count > 0 {
-
-		if res.SSHKeyPairs[0].Name == d.SSHKeyPair {
-			keyExists = true
-			return nil
-		}
+		return fmt.Errorf("ssh key pair (%v) already exists", d.SSHKeyPair)
 	}
-
-	keyExists = false
 	return nil
 }
 
@@ -924,72 +908,31 @@ func (d *Driver) checkInstance() error {
 		return err
 	}
 	if res.Count > 0 {
-		return fmt.Errorf("Instance (%v) already exists.", d.SSHKeyPair)
+		return fmt.Errorf("instance (%v) already exists", d.SSHKeyPair)
 	}
 	return nil
 }
 
 func (d *Driver) createKeyPair() error {
 	cs := d.getClient()
-	var publicKey []byte
-	var err error
 
-	if keyExists {
-		log.Infof("Using %s keypair", d.SSHKeyPair)
-		return nil
+	if err := ssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
+		return err
 	}
 
-	if d.UserDataFile != "" {
-		userDataContents, err := ioutil.ReadFile(d.UserDataFile)
-
-		if err != nil {
-			return err
-		}
-
-		sshKeyYaml := &UserDataYAML{}
-
-		if err != nil {
-			return err
-		}
-
-		if err := yaml.Unmarshal(userDataContents, sshKeyYaml); err != nil {
-			return err
-		}
-		log.Infof("Setting publicKey to %s", sshKeyYaml.SSHAuthorizedKeys[0])
-		publicKey = []byte(sshKeyYaml.SSHAuthorizedKeys[0])
-
-		if err := d.writeSSHKeys(sshKeyYaml.SSHKeys.RSAPrivate, sshKeyYaml.SSHAuthorizedKeys[0]); err != nil {
-			return err
-		}
-
-	} else {
-
-		if err := ssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
-			return err
-		}
-
-		publicKey, err = ioutil.ReadFile(d.GetSSHKeyPath() + ".pub")
-		if err != nil {
-			return err
-		}
-
-	}
-
-	exists, err := d.checkKeyPairByFingerprint(string(publicKey))
-
+	publicKey, err := ioutil.ReadFile(d.GetSSHKeyPath() + ".pub")
 	if err != nil {
 		return err
 	}
 
-	if !exists {
-		log.Infof("Registering SSH key pair %s", d.SSHKeyPair)
-		p := cs.SSH.NewRegisterSSHKeyPairParams(d.SSHKeyPair, string(publicKey))
-		if d.ProjectID != "" {
-			p.SetProjectid(d.ProjectID)
-		}
-		if _, err := cs.SSH.RegisterSSHKeyPair(p); err != nil {
-			return err
-		}
+	log.Infof("Registering SSH key pair...")
+
+	p := cs.SSH.NewRegisterSSHKeyPairParams(d.SSHKeyPair, string(publicKey))
+	if d.ProjectID != "" {
+		p.SetProjectid(d.ProjectID)
+	}
+	if _, err := cs.SSH.RegisterSSHKeyPair(p); err != nil {
+		return err
 	}
 
 	return nil
@@ -999,23 +942,6 @@ func (d *Driver) deleteKeyPair() error {
 	cs := d.getClient()
 
 	log.Infof("Deleting SSH key pair...")
-
-	fp, err := ioutil.ReadFile(d.SSHKeyPath + ".pub")
-
-	if err != nil {
-		return err
-	}
-
-	inUse, err := d.checkKeyPairByFingerprint(string(fp))
-
-	if err != nil {
-		return err
-	}
-
-	if inUse {
-		log.Infof("Key %s is still in use for another VM, skipping key deletion", string(fp))
-		return nil
-	}
 
 	p := cs.SSH.NewDeleteSSHKeyPairParams(d.SSHKeyPair)
 	if d.ProjectID != "" {
@@ -1038,7 +964,7 @@ func (d *Driver) deleteVolumes() error {
 	log.Info("Deleting volumes...")
 
 	p := cs.Volume.NewListVolumesParams()
-	p.SetVirtualmachineid(d.Id)
+	p.SetVirtualmachineid(d.ID)
 	if d.ProjectID != "" {
 		p.SetProjectid(d.ProjectID)
 	}
@@ -1104,7 +1030,7 @@ func (d *Driver) disassociatePublicIP() error {
 func (d *Driver) enableStaticNat() error {
 	cs := d.getClient()
 	log.Infof("Enabling Static Nat...")
-	p := cs.NAT.NewEnableStaticNatParams(d.PublicIPID, d.Id)
+	p := cs.NAT.NewEnableStaticNatParams(d.PublicIPID, d.ID)
 	if _, err := cs.NAT.EnableStaticNat(p); err != nil {
 		return err
 	}
@@ -1139,7 +1065,7 @@ func (d *Driver) configurePortForwardingRule(publicPort, privatePort int) error 
 
 	log.Debugf("Creating port forwarding rule ... : cidr list: %v, port %d", d.CIDRList, publicPort)
 	p := cs.Firewall.NewCreatePortForwardingRuleParams(
-		d.PublicIPID, privatePort, "tcp", publicPort, d.Id)
+		d.PublicIPID, privatePort, "tcp", publicPort, d.ID)
 	p.SetOpenfirewall(false)
 	if _, err := cs.Firewall.CreatePortForwardingRule(p); err != nil {
 		return err
@@ -1274,7 +1200,7 @@ func (d *Driver) createTags() error {
 		}
 		tags[parts[0]] = parts[1]
 	}
-	params := cs.Resourcetags.NewCreateTagsParams([]string{d.Id}, "UserVm", tags)
+	params := cs.Resourcetags.NewCreateTagsParams([]string{d.ID}, "UserVm", tags)
 	_, err := cs.Resourcetags.CreateTags(params)
 	return err
 }
@@ -1290,23 +1216,5 @@ func (d *Driver) setParams(c *cloudstack.CloudStackClient, p interface{}) error 
 	}); ok && d.ZoneID != "" {
 		o.SetZoneid(d.ZoneID)
 	}
-	return nil
-}
-func (d *Driver) writeSSHKeys(priv, pub string) error {
-
-	if priv == "" {
-		return errors.New("A private key must be passed in the userdata file under the ssh_keys")
-	}
-
-	log.Infof("Writing first private key found in userdata file to %s", d.StorePath)
-	if err := ioutil.WriteFile(d.GetSSHKeyPath(), []byte(priv), 0600); err != nil {
-		return err
-	}
-
-	log.Infof("Writing public key to id_rsa to %s.pub", d.GetSSHKeyPath())
-	if err := ioutil.WriteFile(fmt.Sprintf("%s.pub", d.GetSSHKeyPath()), []byte(pub), 0600); err != nil {
-		return err
-	}
-
 	return nil
 }
