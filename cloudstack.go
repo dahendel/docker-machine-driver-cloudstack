@@ -443,7 +443,11 @@ func (d *Driver) Create() error {
 	}
 
 	d.IPAddress = d.PrivateIP
-	d.SSHPort = 22
+	d.SSHPort, err = d.GetSSHPort()
+
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
