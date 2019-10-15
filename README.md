@@ -7,7 +7,7 @@ It allows to create Docker hosts on [Apache CloudStack](https://cloudstack.apach
 ## Added Functionality
 - The `--cloudstack-userdata-file` now supports passing urls
 - In the userdata file if `ssh_authorized_keys` then the driver grabs the first public key and expects that `ssh_keys`
-contains a private key so that docker-machine can ssh into the VM after creation (Deprecated)
+contains a private key so that docker-machine can ssh into the VM after creation
 - It also checks if the key in the userdata file exists in cloudstack based on the public key fingerprint, and if it does writes it to the new
 machines StoragePath (/home/$USER/.docker/machine/machines/$MACHINE_NAME)
 
